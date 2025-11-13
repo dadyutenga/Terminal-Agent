@@ -21,7 +21,7 @@ const program = new Command();
 
 program
   .name('asiat')
-  .description('TermiMind - TUI agentic coding assistant (ASIAT CLI)')
+  .description('ASIAT - TUI agentic coding assistant (ASIAT CLI)')
   .option('-p, --project <path>', 'Path to the project root')
   .option('--db <path>', 'Path to sqlite index database')
   .option('--llm-provider <provider>', 'LLM provider to use (openai|llama)')
