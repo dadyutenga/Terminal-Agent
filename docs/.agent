@@ -1,0 +1,22 @@
+# Agent Rules
+
+## Documentation Guidelines
+
+- Keep documentation clear and concise
+- Update documentation when making changes to the codebase
+- Follow markdown best practices
+- Include code examples where appropriate
+
+## Code Standards
+
+- Write clean, maintainable code
+- Add comments for complex logic
+- Follow the project's coding style
+- Write tests for new features
+
+## Git Workflow
+
+- Create meaningful commit messages
+- Keep commits focused and atomic
+- Review changes before committing
+- Update documentation with code changes
