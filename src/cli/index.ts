@@ -7,8 +7,8 @@ import { createRuntimeContext } from '../services/context.js';
 const program = new Command();
 
 program
-  .name('termimind')
-  .description('TermiMind - TUI agentic coding assistant')
+  .name('asiat')
+  .description('TermiMind - TUI agentic coding assistant (ASIAT CLI)')
   .option('-p, --project <path>', 'Path to the project root')
   .option('--db <path>', 'Path to sqlite index database')
   .option('--llm-provider <provider>', 'LLM provider to use (openai|llama)')
@@ -31,6 +31,6 @@ program
   });
 
 program.parseAsync(process.argv).catch((error) => {
-  console.error('TermiMind failed to start:', error);
+  console.error('ASIAT failed to start:', error);
   process.exitCode = 1;
 });
