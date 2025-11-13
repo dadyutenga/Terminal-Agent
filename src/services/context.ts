@@ -6,6 +6,7 @@ import { LlmGateway } from '../llm/llm-gateway.js';
 import { PatchEngine } from '../patches/patch-engine.js';
 import { CommandExecutor } from '../executor/command-executor.js';
 import { SessionMemory } from '../memory/session-memory.js';
+import { TermiMindAssistant } from './assistant.js';
 
 export type RuntimeContext = {
   config: TermiMindConfig;
@@ -16,6 +17,7 @@ export type RuntimeContext = {
   patches: PatchEngine;
   executor: CommandExecutor;
   memory: SessionMemory;
+  assistant: TermiMindAssistant;
 };
 
 export const createRuntimeContext = async (config: TermiMindConfig): Promise<RuntimeContext> => {
@@ -26,6 +28,7 @@ export const createRuntimeContext = async (config: TermiMindConfig): Promise<Run
   const patches = new PatchEngine(config.projectRoot);
   const executor = new CommandExecutor(config.projectRoot);
   const memory = new SessionMemory();
+  const assistant = new TermiMindAssistant({ intents, indexer, git, llm, patches, executor, memory });
 
   await indexer.initialize();
   indexer.indexProject();
@@ -39,5 +42,6 @@ export const createRuntimeContext = async (config: TermiMindConfig): Promise<Run
     patches,
     executor,
     memory,
+    assistant,
   };
 };

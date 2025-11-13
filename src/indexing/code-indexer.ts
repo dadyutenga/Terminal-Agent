@@ -1,7 +1,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
-import { Project, SyntaxKind, type ProjectOptions } from 'ts-morph';
+import {
+  ClassDeclaration,
+  FunctionDeclaration,
+  InterfaceDeclaration,
+  MethodDeclaration,
+  Project,
+  ProjectOptions,
+  SyntaxKind,
+  VariableDeclaration,
+} from 'ts-morph';
 import type { TermiMindConfig } from '../config/index.js';
 import { cosineSimilarity } from '../utils/math.js';
 
@@ -123,6 +132,113 @@ export class CodeIndexer {
       .slice(0, limit);
 
     return scored.map(({ score, ...file }) => file);
+  }
+
+  describeFile(relativePath: string, focusSymbol?: string): string {
+    if (!this.project) {
+      throw new Error('Project not initialized');
+    }
+    const absolutePath = path.join(this.projectRoot, relativePath);
+    let sourceFile = this.project.getSourceFile(absolutePath);
+    if (!sourceFile) {
+      sourceFile = this.project.addSourceFileAtPathIfExists(absolutePath);
+    }
+
+    if (!sourceFile) {
+      return `No TypeScript AST available for ${relativePath}.`;
+    }
+
+    const descriptions: string[] = [];
+    const focus = focusSymbol?.toLowerCase();
+
+    const pushDescription = (label: string, value: string) => {
+      descriptions.push(`${label}: ${value}`);
+    };
+
+    const functions = sourceFile.getFunctions();
+    for (const fn of functions) {
+      if (descriptions.length > 12) break;
+      if (focus && fn.getName()?.toLowerCase() !== focus) continue;
+      pushDescription('function', this.describeFunction(fn));
+    }
+
+    const classes = sourceFile.getClasses();
+    for (const cls of classes) {
+      if (descriptions.length > 12) break;
+      if (focus && cls.getName()?.toLowerCase() !== focus) continue;
+      pushDescription('class', this.describeClass(cls));
+    }
+
+    const interfaces = sourceFile.getInterfaces();
+    for (const iface of interfaces) {
+      if (descriptions.length > 12) break;
+      if (focus && iface.getName()?.toLowerCase() !== focus) continue;
+      pushDescription('interface', this.describeInterface(iface));
+    }
+
+    const variables = sourceFile.getVariableDeclarations();
+    for (const variable of variables) {
+      if (descriptions.length > 12) break;
+      if (focus && variable.getName().toLowerCase() !== focus) continue;
+      pushDescription('variable', this.describeVariable(variable));
+    }
+
+    if (descriptions.length === 0) {
+      return `No notable declarations found in ${relativePath}.`;
+    }
+
+    return descriptions.join('\n');
+  }
+
+  private describeFunction(fn: FunctionDeclaration): string {
+    const name = fn.getName() ?? 'anonymous';
+    const params = fn
+      .getParameters()
+      .map((param) => `${param.getName()}: ${param.getType().getText()}`)
+      .join(', ');
+    const returnType = fn.getReturnType().getText();
+    return `${name}(${params}) -> ${returnType}`;
+  }
+
+  private describeClass(cls: ClassDeclaration): string {
+    const name = cls.getName() ?? 'AnonymousClass';
+    const heritage = cls
+      .getExtends()
+      ?.getExpression()
+      .getText();
+    const methods = cls
+      .getMethods()
+      .slice(0, 5)
+      .map((method) => this.describeMethod(method))
+      .join('; ');
+    const bases = heritage ? ` extends ${heritage}` : '';
+    return `${name}${bases} { ${methods} }`;
+  }
+
+  private describeMethod(method: MethodDeclaration): string {
+    const params = method
+      .getParameters()
+      .map((param) => `${param.getName()}: ${param.getType().getText()}`)
+      .join(', ');
+    const returnType = method.getReturnType().getText();
+    return `${method.getName()}(${params}) -> ${returnType}`;
+  }
+
+  private describeInterface(iface: InterfaceDeclaration): string {
+    const name = iface.getName();
+    const properties = iface
+      .getProperties()
+      .slice(0, 6)
+      .map((prop) => `${prop.getName()}: ${prop.getType().getText()}`)
+      .join('; ');
+    return `${name} { ${properties} }`;
+  }
+
+  private describeVariable(variable: VariableDeclaration): string {
+    const type = variable.getType().getText();
+    const initializer = variable.getInitializer()?.getKind();
+    const initializerInfo = initializer ? ` = ${SyntaxKind[initializer]}` : '';
+    return `${variable.getName()}: ${type}${initializerInfo}`;
   }
 
   private walkProject(): string[] {

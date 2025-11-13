@@ -42,7 +42,8 @@ export class GitManager {
   }
 
   commit(message: string): void {
-    this.runGit(['commit', '-am', JSON.stringify(message)]);
+    this.runGit(['add', '--all']);
+    this.runGit(['commit', '-m', JSON.stringify(message)]);
   }
 
   diff(pathspec?: string): string {
@@ -51,6 +52,14 @@ export class GitManager {
       args.push('--', pathspec);
     }
     return this.runGit(args);
+  }
+
+  unstagedChanges(): string {
+    return this.runGit(['diff']);
+  }
+
+  stagedDiff(): string {
+    return this.runGit(['diff', '--cached']);
   }
 
   push(remote = 'origin', branch?: string): string {

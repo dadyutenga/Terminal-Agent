@@ -19,7 +19,6 @@ TermiMind is a terminal-native, Ink-powered TUI coding assistant that orchestrat
 pnpm install
 pnpm run build
 pnpm exec asiat --project /path/to/your/project
-pnpm exec termimind --project /path/to/your/project
 ```
 
 During development you can run the CLI directly with TypeScript support:
