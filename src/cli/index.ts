@@ -4,11 +4,24 @@ import { loadConfig, TermiMindConfig } from '../config/index.js';
 import { runTui } from '../tui/index.js';
 import { createRuntimeContext } from '../services/context.js';
 
+const ASIAT_LOGO = String.raw`
+   ▄▄▄█████▓ ▒█████   ██████  ██▓▄▄▄█████▓
+   ▓  ██▒ ▓▒▒██▒  ██▒██    ▒ ▓██▒▓  ██▒ ▓▒
+   ▒ ▓██░ ▒░▒██░  ██▒░ ▓██▄   ▒██▒▒ ▓██░ ▒░
+   ░ ▓██▓ ░ ▒██   ██░  ▒   ██▒░██░░ ▓██▓ ░ 
+     ▒██▒ ░ ░ ████▓▒░▒██████▒▒░██░  ▒██▒ ░ 
+     ▒ ░░   ░ ▒░▒░▒░ ▒ ▒▓▒ ▒ ░░▓    ▒ ░░   
+       ░      ░ ▒ ▒░ ░ ░▒  ░ ░ ▒ ░    ░    
+     ░      ░ ░ ░ ▒  ░  ░  ░   ▒ ░  ░      
+                  ░ ░        ░   ░         
+          A   S   i   A   T    C L I       
+`;
+
 const program = new Command();
 
 program
   .name('asiat')
-  .description('TermiMind - TUI agentic coding assistant (ASIAT CLI)')
+  .description('ASIAT - TUI agentic coding assistant (ASIAT CLI)')
   .option('-p, --project <path>', 'Path to the project root')
   .option('--db <path>', 'Path to sqlite index database')
   .option('--llm-provider <provider>', 'LLM provider to use (openai|llama)')
@@ -27,6 +40,7 @@ program
 
     const config = loadConfig(configOverrides);
     const context = await createRuntimeContext(config);
+    console.log(ASIAT_LOGO);
     await runTui(context);
   });
 
