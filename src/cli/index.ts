@@ -28,15 +28,21 @@ program
   .option('--llm-model <model>', 'LLM model identifier')
   .option('--llm-base-url <url>', 'Custom LLM base URL')
   .action(async (options) => {
-    const configOverrides: Partial<TermiMindConfig> = {
-      projectRoot: options.project,
-      databasePath: options.db,
-      llm: {
-        provider: options.llmProvider,
-        model: options.llmModel,
-        baseUrl: options.llmBaseUrl,
-      },
-    };
+    const configOverrides: Partial<TermiMindConfig> = {};
+    
+    if (options.project) {
+      configOverrides.projectRoot = options.project;
+    }
+    if (options.db) {
+      configOverrides.databasePath = options.db;
+    }
+    if (options.llmProvider || options.llmModel || options.llmBaseUrl) {
+      configOverrides.llm = {
+        ...(options.llmProvider && { provider: options.llmProvider }),
+        ...(options.llmModel && { model: options.llmModel }),
+        ...(options.llmBaseUrl && { baseUrl: options.llmBaseUrl }),
+      };
+    }
 
     const config = loadConfig(configOverrides);
     const context = await createRuntimeContext(config);
