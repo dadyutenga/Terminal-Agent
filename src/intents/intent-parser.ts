@@ -4,6 +4,7 @@ export type IntentType =
   | 'run'
   | 'git'
   | 'create-file'
+  | 'read-file'
   | 'apply-patch'
   | 'discard-patch'
   | 'unknown';
@@ -19,6 +20,7 @@ const intentMatchers: Array<{ type: IntentType; patterns: RegExp[] }> = [
   { type: 'run', patterns: [/(run|execute)\b/i, /test/i, /build/i, /lint/i, /dev/i, /migration/i] },
   { type: 'git', patterns: [/git/i, /commit/i, /branch/i, /push/i, /unstaged/i] },
   { type: 'create-file', patterns: [/create file/i, /new file/i, /write file/i] },
+  { type: 'read-file', patterns: [/^(read|open|view|show|cat|display)\s+/i, /show (?:me )?(?:the )?file/i, /open (?:the )?file/i] },
   { type: 'apply-patch', patterns: [/apply patch/i, /accept patch/i] },
   { type: 'discard-patch', patterns: [/discard patch/i, /reject patch/i] },
 ];
@@ -106,6 +108,27 @@ export class IntentParser {
       if (fileMatch) {
         return { type: 'refactor', arguments: { path: fileMatch[1] } };
       }
+    }
+
+    if (matched.type === 'read-file') {
+      // Try to extract file path from various patterns
+      const patterns = [
+        /^(?:read|open|view|show|cat|display)\s+(?:file\s+)?(.+?)$/i,
+        /show (?:me )?(?:the )?file\s+(.+?)$/i,
+        /open (?:the )?file\s+(.+?)$/i,
+        /(?:read|view)\s+(.+?)$/i,
+      ];
+
+      for (const pattern of patterns) {
+        const match = trimmed.match(pattern);
+        if (match && match[1]) {
+          const filePath = match[1].trim().replace(/^["']|["']$/g, ''); // Remove quotes if present
+          return { type: 'read-file', arguments: { path: filePath } };
+        }
+      }
+
+      // If no specific pattern matched, return generic read-file intent
+      return { type: 'read-file' };
     }
 
     return { type: matched.type };

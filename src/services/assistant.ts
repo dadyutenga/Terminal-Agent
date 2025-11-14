@@ -7,6 +7,7 @@ import type { ChatMessage } from '../ai/types.js';
 import type { PatchEngine } from '../patches/patch-engine.js';
 import type { SessionMemory } from '../memory/session-memory.js';
 import type { IntentParser, ParsedIntent } from '../intents/intent-parser.js';
+import type { FileReader } from '../files/file-reader.js';
 
 export type AssistantDependencies = {
   intents: IntentParser;
@@ -16,6 +17,7 @@ export type AssistantDependencies = {
   executor: CommandExecutor;
   patches: PatchEngine;
   memory: SessionMemory;
+  fileReader: FileReader;
 };
 
 export class ASIATAssistant {
@@ -37,6 +39,8 @@ export class ASIATAssistant {
         return this.handleGitIntent(intent);
       case 'create-file':
         return this.handleCreateFile(intent);
+      case 'read-file':
+        return this.handleReadFile(intent);
       case 'explain':
         return this.handleExplain(message, intent);
       case 'refactor':
@@ -125,6 +129,34 @@ export class ASIATAssistant {
     this.deps.patches.writeFile(targetPath, '');
     await this.deps.indexer.indexProject();
     return `Created file ${targetPath}`;
+  }
+
+  private handleReadFile(intent: ParsedIntent): string {
+    const filePath = intent.arguments?.path;
+    
+    if (!filePath) {
+      return 'Please specify a file path. Example: "read src/index.ts"';
+    }
+
+    const result = this.deps.fileReader.readFile(filePath);
+
+    if (!result.success) {
+      return `❌ ${result.error}`;
+    }
+
+    const language = this.deps.fileReader.detectLanguage(result.filePath);
+    const lineCount = result.content?.split('\n').length || 0;
+
+    // Format the output with file info and content
+    return [
+      `📄 File: ${result.relativePath}`,
+      `📝 Language: ${language}`,
+      `📏 Lines: ${lineCount}`,
+      '',
+      '```' + language,
+      result.content,
+      '```',
+    ].join('\n');
   }
 
   private async handleExplain(message: string, intent: ParsedIntent): Promise<string> {

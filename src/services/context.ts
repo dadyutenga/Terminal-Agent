@@ -7,6 +7,7 @@ import { PatchEngine } from '../patches/patch-engine.js';
 import { CommandExecutor } from '../executor/command-executor.js';
 import { SessionMemory } from '../memory/session-memory.js';
 import { ASIATAssistant } from './assistant.js';
+import { FileReader } from '../files/file-reader.js';
 
 export type RuntimeContext = {
   config: ASIATConfig;
@@ -17,6 +18,7 @@ export type RuntimeContext = {
   patches: PatchEngine;
   executor: CommandExecutor;
   memory: SessionMemory;
+  fileReader: FileReader;
   assistant: ASIATAssistant;
 };
 
@@ -28,7 +30,8 @@ export const createRuntimeContext = async (config: ASIATConfig): Promise<Runtime
   const patches = new PatchEngine(config.projectRoot);
   const executor = new CommandExecutor(config.projectRoot);
   const memory = new SessionMemory();
-  const assistant = new ASIATAssistant({ intents, indexer, git, llm, patches, executor, memory });
+  const fileReader = new FileReader(config.projectRoot);
+  const assistant = new ASIATAssistant({ intents, indexer, git, llm, patches, executor, memory, fileReader });
 
   await indexer.initialize();
   await indexer.indexProject();
@@ -42,6 +45,7 @@ export const createRuntimeContext = async (config: ASIATConfig): Promise<Runtime
     patches,
     executor,
     memory,
+    fileReader,
     assistant,
   };
 };
