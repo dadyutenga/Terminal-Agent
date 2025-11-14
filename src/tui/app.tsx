@@ -174,40 +174,35 @@ export const ASIATApp: React.FC<ASIATAppProps> = ({ context }) => {
   );
 
   const handleSubmit = useCallback(
-    async (value: string): Promise<boolean> => {
-      if (!value.trim() || busy) return false;
+    async (value: string) => {
+      if (!value.trim() || busy) return;
 
       if (value.startsWith('/')) {
         const { command, args } = resolveCommand(value);
         if (!command) {
-          setInput('');
           appendMessage({
             role: 'system',
             content: `Unknown command: ${value}`,
             timestamp: Date.now(),
           });
-          return true;
+          return;
         }
-        setInput('');
         await runCommand(command, args, value);
-        return true;
+        return;
       }
 
       setBusy(true);
       appendMessage({ role: 'user', content: value, timestamp: Date.now() });
-      setInput('');
       setStatus('Processing...');
 
       try {
         const response = await context.assistant.handleMessage(value);
         appendMessage({ role: 'assistant', content: response, timestamp: Date.now() });
         setStatus('Ready');
-        return true;
       } catch (error) {
         const message = (error as Error).message;
         appendMessage({ role: 'assistant', content: `Error: ${message}`, timestamp: Date.now() });
         setStatus('Error');
-        return true;
       } finally {
         setBusy(false);
       }
