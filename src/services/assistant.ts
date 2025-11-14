@@ -29,14 +29,100 @@ export type AssistantDependencies = {
 
 export class ASIATAssistant {
   private pendingPatch: string | null = null;
+  private pendingAction: {
+    type: 'create-file' | 'modify-file' | 'delete-file' | 'run-command';
+    toolName: string;
+    input: any;
+    preview: string;
+  } | null = null;
 
   constructor(private readonly deps: AssistantDependencies) {}
+
+  /**
+   * Check if there's a pending action awaiting approval
+   */
+  hasPendingAction(): boolean {
+    return this.pendingAction !== null;
+  }
+
+  /**
+   * Get the pending action details
+   */
+  getPendingAction() {
+    return this.pendingAction;
+  }
+
+  /**
+   * Execute the pending action after approval
+   */
+  async executePendingAction(): Promise<string> {
+    if (!this.pendingAction) {
+      return '❌ No pending action to execute';
+    }
+
+    const { toolName, input } = this.pendingAction;
+    
+    try {
+      const context = {
+        projectRoot: this.deps.projectRoot,
+        currentDir: process.cwd(),
+      };
+
+      const result = await this.deps.toolRegistry.execute(toolName, input, context);
+      
+      // Record the execution
+      this.deps.approvalManager.recordExecution(toolName, input, result);
+      
+      // Clear pending action
+      this.pendingAction = null;
+
+      if (result.status === 'success') {
+        // Re-index project if file was created/modified
+        if (toolName === 'create_file' || toolName === 'write_file') {
+          await this.deps.indexer.indexProject();
+        }
+        
+        return `✅ Successfully executed ${toolName}\n\n${this.deps.approvalManager.formatExecutionResult(result)}`;
+      } else {
+        return `❌ Failed to execute ${toolName}\n\n${result.error || 'Unknown error'}`;
+      }
+    } catch (error) {
+      this.pendingAction = null;
+      return `❌ Error executing action: ${(error as Error).message}`;
+    }
+  }
+
+  /**
+   * Cancel the pending action
+   */
+  cancelPendingAction(): string {
+    if (!this.pendingAction) {
+      return 'No pending action to cancel';
+    }
+    
+    const actionType = this.pendingAction.type;
+    this.pendingAction = null;
+    return `🚫 Cancelled ${actionType} action`;
+  }
 
   updateLlm(newLlm: AiManager): void {
     this.deps.llm = newLlm;
   }
 
   async handleMessage(message: string): Promise<string> {
+    const trimmed = message.trim().toLowerCase();
+    
+    // Check if user is responding to a pending action
+    if (this.pendingAction) {
+      if (trimmed === 'yes' || trimmed === 'y') {
+        return this.executePendingAction();
+      } else if (trimmed === 'no' || trimmed === 'n' || trimmed === 'cancel') {
+        return this.cancelPendingAction();
+      }
+      // If not yes/no, continue with normal processing
+      // but remind them they have a pending action
+    }
+    
     const intent = this.deps.intents.parse(message);
 
     switch (intent.type) {
@@ -137,11 +223,210 @@ export class ASIATAssistant {
     }
   }
 
+  /**
+   * Handle create-file intent using the tool system
+   * Uses LLM to generate content based on user request, then shows preview for approval
+   */
   private async handleCreateFile(intent: ParsedIntent): Promise<string> {
-    const targetPath = intent.arguments?.path ?? `notes/${uuid()}.md`;
-    this.deps.patches.writeFile(targetPath, '');
-    await this.deps.indexer.indexProject();
-    return `Created file ${targetPath}`;
+    const targetPath = intent.arguments?.path;
+    
+    if (!targetPath) {
+      return 'Please specify a file path. Example: "create file index.html"';
+    }
+
+    // Determine file type from extension
+    const extension = targetPath.split('.').pop() || '';
+    const fileType = extension || 'file';
+
+    // Generate content using LLM based on file type
+    let content = '';
+    
+    try {
+      const prompt = this.buildContentGenerationPrompt(targetPath, fileType);
+      const response = await this.deps.llm.chat(prompt);
+      content = this.extractCodeFromResponse(response.content);
+      
+      if (!content) {
+        content = response.content.trim();
+      }
+    } catch (error) {
+      // Fallback to basic content
+      content = this.getDefaultContent(fileType);
+    }
+
+    // Generate a creation plan with the generated content
+    const plan = this.deps.planGenerator.generateCreateFilePlan(
+      targetPath,
+      content,
+      true // create directories if needed
+    );
+    
+    // Generate preview
+    const preview = await this.deps.approvalManager.generatePlanPreview(plan, {
+      projectRoot: this.deps.projectRoot,
+      currentDir: process.cwd(),
+    });
+
+    // Store the pending action for user approval
+    this.pendingAction = {
+      type: 'create-file',
+      toolName: 'create_file',
+      input: {
+        filePath: targetPath,
+        content,
+        createDirs: true,
+      },
+      preview,
+    };
+
+    // Return the preview and wait for approval
+    return [
+      preview,
+      '',
+      '📋 FILE CONTENT PREVIEW:',
+      '─'.repeat(60),
+      content.split('\n').slice(0, 30).join('\n'), // Show first 30 lines
+      content.split('\n').length > 30 ? `\n... (${content.split('\n').length - 30} more lines)` : '',
+      '─'.repeat(60),
+      '',
+      '⚠️ This action requires approval.',
+      'Reply with "yes" to create the file or "no" to cancel.',
+    ].join('\n');
+  }
+
+  /**
+   * Build a prompt for LLM to generate file content
+   */
+  private buildContentGenerationPrompt(filePath: string, fileType: string): ChatMessage[] {
+    const systemPrompt = 'You are a code generation assistant. Generate ONLY the code content without explanations, markdown formatting, or code fences. Output raw code that can be saved directly to a file.';
+    
+    let userPrompt = '';
+    
+    switch (fileType) {
+      case 'html':
+        userPrompt = `Generate a complete, modern HTML5 file for ${filePath}. Include:
+- Proper DOCTYPE and semantic HTML5 structure
+- Meta tags for charset and viewport
+- A professional, clean layout
+- Basic styling (either inline or in a <style> tag)
+- Meaningful content (not just "Hello World")
+
+Output ONLY the HTML code, no explanations.`;
+        break;
+        
+      case 'css':
+        userPrompt = `Generate a comprehensive CSS file for ${filePath}. Include:
+- CSS reset/normalize styles
+- Modern, responsive design patterns
+- Flexbox or Grid layouts
+- Professional color scheme and typography
+- Responsive breakpoints
+
+Output ONLY the CSS code, no explanations.`;
+        break;
+        
+      case 'js':
+      case 'ts':
+        userPrompt = `Generate a well-structured ${fileType === 'ts' ? 'TypeScript' : 'JavaScript'} file for ${filePath}. Include:
+- Proper module structure
+- Type definitions (if TypeScript)
+- Clean, documented code
+- Modern ES6+ syntax
+
+Output ONLY the code, no explanations.`;
+        break;
+        
+      case 'md':
+        userPrompt = `Generate a well-formatted Markdown file for ${filePath}. Include:
+- Clear headings and structure
+- Professional documentation format
+- Relevant sections based on the filename
+
+Output ONLY the Markdown content, no explanations.`;
+        break;
+        
+      default:
+        userPrompt = `Generate appropriate content for a ${fileType} file named ${filePath}. 
+Make it professional, complete, and ready to use.
+Output ONLY the file content, no explanations.`;
+    }
+    
+    return this.buildMessages(systemPrompt, userPrompt);
+  }
+
+  /**
+   * Extract code from LLM response (removes markdown code fences if present)
+   */
+  private extractCodeFromResponse(response: string): string {
+    // Remove markdown code fences
+    const codeBlockMatch = response.match(/```[\w]*\n([\s\S]*?)\n```/);
+    if (codeBlockMatch) {
+      return codeBlockMatch[1].trim();
+    }
+    
+    // Check if response starts with code fence
+    if (response.startsWith('```')) {
+      const lines = response.split('\n');
+      lines.shift(); // Remove first ```
+      if (lines[lines.length - 1].trim() === '```') {
+        lines.pop(); // Remove last ```
+      }
+      return lines.join('\n').trim();
+    }
+    
+    return response.trim();
+  }
+
+  /**
+   * Get default/fallback content for a file type
+   */
+  private getDefaultContent(fileType: string): string {
+    switch (fileType) {
+      case 'html':
+        return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <h1>Hello, World!</h1>
+    <p>This is a basic HTML file.</p>
+</body>
+</html>`;
+      
+      case 'css':
+        return `/* Stylesheet */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: system-ui, -apple-system, sans-serif;
+    line-height: 1.6;
+}`;
+      
+      case 'js':
+        return `// JavaScript file
+console.log('Hello, World!');`;
+      
+      case 'ts':
+        return `// TypeScript file
+console.log('Hello, World!');`;
+      
+      case 'md':
+        return `# Document
+
+## Overview
+
+This is a markdown file.`;
+      
+      default:
+        return '';
+    }
   }
 
   private handleReadFile(intent: ParsedIntent): string {
@@ -320,6 +605,28 @@ export class ASIATAssistant {
   }
 
   private async handleGeneralConversation(message: string): Promise<string> {
+    // Check if this might be a file creation request that wasn't caught by intent parser
+    const fileCreationIndicators = [
+      /create.*(?:html|css|js|ts|file)/i,
+      /make.*(?:html|css|js|ts|file)/i,
+      /generate.*(?:html|css|js|file)/i,
+      /build.*(?:html|css|js|file)/i,
+    ];
+    
+    const seemsLikeFileCreation = fileCreationIndicators.some(pattern => pattern.test(message));
+    
+    if (seemsLikeFileCreation) {
+      // Extract file type or use default
+      const fileTypeMatch = message.match(/(html|css|js|ts|jsx|tsx|json|md)/i);
+      const fileType = fileTypeMatch ? fileTypeMatch[1].toLowerCase() : 'html';
+      
+      // Re-route to create-file handler with detected file type
+      return this.handleCreateFile({
+        type: 'create-file',
+        arguments: { path: `index.${fileType}` }
+      });
+    }
+    
     const related = await this.deps.indexer.search(message, 3);
     const contextBlocks = related
       .map((file) => {
@@ -328,9 +635,21 @@ export class ASIATAssistant {
       })
       .join('\n\n');
 
+    const systemPrompt = `You are ASIA, an adaptive software intelligence assistant with powerful file manipulation capabilities.
+
+Available Actions:
+- CREATE files: Just ask me to "create [filename]" or "create an HTML file"
+- READ files: Ask to "read [filename]"
+- MODIFY files: Ask to "modify [filename]"
+- DELETE files: Ask to "delete [filename]"
+
+When users want to create or manipulate files, I should USE my file tools, not just explain how they could do it manually.
+
+Provide concise, actionable guidance grounded in the project context.`;
+
     const response = await this.deps.llm.chat(
       this.buildMessages(
-        'You are ASIA, an adaptive software intelligence assistant comfortable working across all languages. Provide concise, actionable guidance grounded in the project context.',
+        systemPrompt,
         `User request: ${message}${contextBlocks ? `\n\nIndexed context:\n${contextBlocks}` : ''}`
       )
     );

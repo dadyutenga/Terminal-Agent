@@ -1,3 +1,4 @@
+import * as path from 'path';
 import {
   Tool,
   ToolResult,
@@ -93,7 +94,6 @@ export abstract class BaseTool<TInput = any, TOutput = any>
    * Helper: Validate file path is within project
    */
   protected isPathSafe(filePath: string, projectRoot: string): boolean {
-    const path = require('path');
     const resolved = path.resolve(projectRoot, filePath);
     const normalized = path.normalize(resolved);
     return normalized.startsWith(path.normalize(projectRoot));

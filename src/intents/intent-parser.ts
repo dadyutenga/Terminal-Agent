@@ -18,15 +18,38 @@ export type ParsedIntent = {
 };
 
 const intentMatchers: Array<{ type: IntentType; patterns: RegExp[] }> = [
+  // File operations - check these FIRST before general patterns
+  { type: 'create-file', patterns: [
+    /create (?:new )?(?:a )?(?:an )?(?:html|css|js|ts|json|md|txt)?\s*file/i,
+    /new file/i,
+    /make (?:a )?(?:an )?file/i,
+    /^create\s+[\w.-]+\.(html|css|js|ts|json|md|txt|jsx|tsx)/i, // "create index.html"
+    /^-?create[-_]file\s+/i, // "-create_file test.html"
+  ]},
+  { type: 'read-file', patterns: [
+    /^(read|open|view|show|cat|display)\s+/i,
+    /show (?:me )?(?:the )?file/i,
+    /open (?:the )?file/i
+  ]},
+  { type: 'modify-file', patterns: [
+    /modify (?:the )?file/i,
+    /update (?:the )?file/i,
+    /change (?:the )?file/i,
+    /edit (?:the )?file/i,
+    /write to/i
+  ]},
+  { type: 'delete-file', patterns: [
+    /delete (?:the )?file/i,
+    /remove (?:the )?file/i,
+    /rm\s+/i
+  ]},
+  
+  // Other intents
   { type: 'explain', patterns: [/explain/i, /what does/i, /describe/i] },
   { type: 'refactor', patterns: [/refactor/i, /improve/i, /optimi[sz]e/i] },
-  { type: 'run', patterns: [/(run|execute)\b/i, /test/i, /build/i, /lint/i, /dev/i, /migration/i] },
   { type: 'git', patterns: [/git/i, /commit/i, /branch/i, /push/i, /unstaged/i] },
-  { type: 'create-file', patterns: [/create (?:new )?(?:a )?file/i, /new file/i, /make (?:a )?file/i] },
-  { type: 'modify-file', patterns: [/modify (?:the )?file/i, /update (?:the )?file/i, /change (?:the )?file/i, /edit (?:the )?file/i, /write to/i] },
-  { type: 'delete-file', patterns: [/delete (?:the )?file/i, /remove (?:the )?file/i, /rm\s+/i] },
-  { type: 'read-file', patterns: [/^(read|open|view|show|cat|display)\s+/i, /show (?:me )?(?:the )?file/i, /open (?:the )?file/i] },
   { type: 'run-command', patterns: [/run command/i, /execute command/i, /shell/i] },
+  { type: 'run', patterns: [/(run|execute)\b/i, /\btest\b/i, /\bbuild\b/i, /\blint\b/i, /\bdev\b/i, /migration/i] },
   { type: 'apply-patch', patterns: [/apply patch/i, /accept patch/i] },
   { type: 'discard-patch', patterns: [/discard patch/i, /reject patch/i] },
 ];
@@ -69,19 +92,38 @@ export class IntentParser {
     }
 
     if (matched.type === 'create-file') {
-      // Extract file path and optionally content
+      // Extract file path from various patterns
       const patterns = [
-        /create (?:new )?(?:a )?file\s+(?:called\s+|named\s+)?([^\s]+)/i,
+        /^-?create[-_]file\s+([^\s]+)/i, // "-create_file test.html"
+        /^create\s+([^\s]+\.\w+)/i, // "create index.html"
+        /create (?:new )?(?:a )?(?:an )?file\s+(?:called\s+|named\s+)?([^\s]+)/i,
         /new file\s+([^\s]+)/i,
-        /make (?:a )?file\s+([^\s]+)/i,
+        /make (?:a )?(?:an )?file\s+([^\s]+)/i,
+        /create (?:new )?(?:a )?(?:an )?(html|css|js|ts|json|md|txt)\s*file/i, // "create html file"
       ];
 
       for (const pattern of patterns) {
         const match = trimmed.match(pattern);
         if (match && match[1]) {
-          return { type: 'create-file', arguments: { path: match[1].trim() } };
+          const path = match[1].trim();
+          // If it's just a file type, create a default filename
+          const fileTypes = ['html', 'css', 'js', 'ts', 'json', 'md', 'txt'];
+          if (fileTypes.includes(path.toLowerCase())) {
+            return { type: 'create-file', arguments: { path: `index.${path.toLowerCase()}` } };
+          }
+          return { type: 'create-file', arguments: { path } };
         }
       }
+      
+      // If no specific file mentioned, check if user wants to create an HTML/CSS/etc file
+      const fileTypeMatch = trimmed.match(/create (?:new )?(?:a )?(?:an )?(html|css|js|ts|json|md|txt)\s*file/i);
+      if (fileTypeMatch) {
+        const extension = fileTypeMatch[1].toLowerCase();
+        return { type: 'create-file', arguments: { path: `index.${extension}` } };
+      }
+      
+      // Generic create file without path
+      return { type: 'create-file' };
     }
 
     if (matched.type === 'modify-file') {
