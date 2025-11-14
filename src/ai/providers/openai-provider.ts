@@ -29,15 +29,20 @@ export class OpenAiProvider implements AiProvider {
       max_tokens: options.maxOutputTokens,
     });
 
-    const choice = response.choices[0];
+    const choice = response.choices?.[0];
+
+    const content = choice?.message?.content ?? '';
+    const responseModel = response.model ?? model;
+    const usage = {
+      promptTokens: response.usage?.prompt_tokens ?? undefined,
+      completionTokens: response.usage?.completion_tokens ?? undefined,
+      totalTokens: response.usage?.total_tokens ?? undefined,
+    };
+
     return {
-      content: choice.message?.content ?? '',
-      model: response.model ?? model,
-      usage: {
-        promptTokens: response.usage?.prompt_tokens,
-        completionTokens: response.usage?.completion_tokens,
-        totalTokens: response.usage?.total_tokens,
-      },
+      content,
+      model: responseModel,
+      usage,
       raw: response,
     };
   }

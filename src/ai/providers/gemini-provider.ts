@@ -58,7 +58,7 @@ export class GeminiProvider implements AiProvider {
       }));
 
     const model = options.model ?? this.defaultModel;
-    const url = `${this.baseUrl}/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${this.apiKey}`;
+    const url = `${this.baseUrl}/v1beta/models/${encodeURIComponent(model)}:generateContent`;
     const body: Record<string, unknown> = {
       contents: conversation,
       generationConfig: {
@@ -74,7 +74,10 @@ export class GeminiProvider implements AiProvider {
 
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': this.apiKey,
+      },
       body: JSON.stringify(body),
     });
 
