@@ -461,6 +461,10 @@ This is a markdown file.`;
    * Handle modify-file intent using the tool system
    * Shows a preview and requires approval before modifying
    */
+  /**
+   * Handle modify-file intent using the tool system
+   * Reads current content, asks LLM for modifications, shows preview, requires approval
+   */
   private async handleModifyFile(intent: ParsedIntent): Promise<string> {
     const filePath = intent.arguments?.path;
     
@@ -468,17 +472,30 @@ This is a markdown file.`;
       return 'Please specify a file path to modify. Example: "modify src/index.ts"';
     }
 
-    // For now, return a message indicating this requires the agentic workflow
-    // The full implementation will be done through the approval UI
+    // First, read the current file content
+    const readResult = this.deps.fileReader.readFile(filePath);
+    
+    if (!readResult.success) {
+      return `❌ Cannot modify file: ${readResult.error}`;
+    }
+
+    // For now, ask the user what changes they want
+    // In a full implementation, this would use LLM to generate a diff
     return [
-      `📝 To modify ${filePath}, please provide the new content or specific changes.`,
+      `📝 Ready to modify: ${filePath}`,
       ``,
-      `I can help you:`,
-      `  • Replace specific text`,
-      `  • Add new code sections`,
-      `  • Refactor existing code`,
+      `📄 Current file info:`,
+      `   Language: ${this.deps.fileReader.detectLanguage(filePath)}`,
+      `   Lines: ${readResult.content?.split('\n').length || 0}`,
+      `   Size: ${readResult.content?.length || 0} bytes`,
       ``,
-      `Tell me what changes you'd like to make!`,
+      `What would you like to change? Tell me specifically:`,
+      `  • "Add a new function called X"`,
+      `  • "Change the title to Y"`,
+      `  • "Replace line 10 with Z"`,
+      `  • "Add import statement for A"`,
+      ``,
+      `Or provide the complete new content for the file.`,
     ].join('\n');
   }
 
@@ -502,11 +519,23 @@ This is a markdown file.`;
       currentDir: process.cwd(),
     });
 
+    // Store the pending action for user approval
+    this.pendingAction = {
+      type: 'delete-file',
+      toolName: 'delete_file',
+      input: {
+        filePath,
+        backup: true,
+        confirmDangerous: false,
+      },
+      preview,
+    };
+
     return [
       preview,
       '',
       '⚠️ This action requires approval.',
-      'Use "yes" to proceed or "no" to cancel.',
+      'Reply with "yes" to proceed or "no" to cancel.',
       '',
       'Note: A backup will be created before deletion.',
     ].join('\n');
@@ -537,11 +566,23 @@ This is a markdown file.`;
       currentDir: process.cwd(),
     });
 
+    // Store the pending action for user approval
+    this.pendingAction = {
+      type: 'run-command',
+      toolName: 'run_command',
+      input: {
+        command: cmd,
+        args,
+        cwd: this.deps.projectRoot,
+      },
+      preview,
+    };
+
     return [
       preview,
       '',
       '⚠️ This action requires approval.',
-      'Use "yes" to proceed or "no" to cancel.',
+      'Reply with "yes" to proceed or "no" to cancel.',
     ].join('\n');
   }
 
@@ -626,6 +667,35 @@ This is a markdown file.`;
         arguments: { path: `index.${fileType}` }
       });
     }
+
+    // Check if this is a command execution request
+    const commandIndicators = [
+      /(?:do|run|execute)\s+(?:a\s+)?(?:dir|ls|pwd|git|npm|node|python)/i,
+      /list\s+(?:files|directory|folders)/i,
+      /show\s+(?:files|directory)/i,
+    ];
+
+    const seemsLikeCommand = commandIndicators.some(pattern => pattern.test(message));
+
+    if (seemsLikeCommand) {
+      // Extract the command
+      let command = message;
+      
+      // Common conversational patterns to command mappings
+      if (/do\s+(?:a\s+)?(dir|ls)/i.test(message)) {
+        command = process.platform === 'win32' ? 'dir' : 'ls';
+      } else if (/list\s+files/i.test(message)) {
+        command = process.platform === 'win32' ? 'dir' : 'ls -la';
+      } else if (/show\s+files/i.test(message)) {
+        command = process.platform === 'win32' ? 'dir' : 'ls';
+      }
+
+      // Re-route to run-command handler
+      return this.handleRunCommand({
+        type: 'run-command',
+        arguments: { command }
+      });
+    }
     
     const related = await this.deps.indexer.search(message, 3);
     const contextBlocks = related
@@ -642,6 +712,7 @@ Available Actions:
 - READ files: Ask to "read [filename]"
 - MODIFY files: Ask to "modify [filename]"
 - DELETE files: Ask to "delete [filename]"
+- RUN commands: Ask to "run command: [command]" or "do a dir/ls"
 
 When users want to create or manipulate files, I should USE my file tools, not just explain how they could do it manually.
 
