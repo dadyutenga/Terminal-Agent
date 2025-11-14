@@ -4,7 +4,10 @@ export type IntentType =
   | 'run'
   | 'git'
   | 'create-file'
+  | 'modify-file'
+  | 'delete-file'
   | 'read-file'
+  | 'run-command'
   | 'apply-patch'
   | 'discard-patch'
   | 'unknown';
@@ -19,8 +22,11 @@ const intentMatchers: Array<{ type: IntentType; patterns: RegExp[] }> = [
   { type: 'refactor', patterns: [/refactor/i, /improve/i, /optimi[sz]e/i] },
   { type: 'run', patterns: [/(run|execute)\b/i, /test/i, /build/i, /lint/i, /dev/i, /migration/i] },
   { type: 'git', patterns: [/git/i, /commit/i, /branch/i, /push/i, /unstaged/i] },
-  { type: 'create-file', patterns: [/create file/i, /new file/i, /write file/i] },
+  { type: 'create-file', patterns: [/create (?:new )?(?:a )?file/i, /new file/i, /make (?:a )?file/i] },
+  { type: 'modify-file', patterns: [/modify (?:the )?file/i, /update (?:the )?file/i, /change (?:the )?file/i, /edit (?:the )?file/i, /write to/i] },
+  { type: 'delete-file', patterns: [/delete (?:the )?file/i, /remove (?:the )?file/i, /rm\s+/i] },
   { type: 'read-file', patterns: [/^(read|open|view|show|cat|display)\s+/i, /show (?:me )?(?:the )?file/i, /open (?:the )?file/i] },
+  { type: 'run-command', patterns: [/run command/i, /execute command/i, /shell/i] },
   { type: 'apply-patch', patterns: [/apply patch/i, /accept patch/i] },
   { type: 'discard-patch', patterns: [/discard patch/i, /reject patch/i] },
 ];
@@ -63,9 +69,61 @@ export class IntentParser {
     }
 
     if (matched.type === 'create-file') {
-      const fileMatch = trimmed.match(/(?:create|new) file\s+([\w./-]+)/i);
-      if (fileMatch) {
-        return { type: 'create-file', arguments: { path: fileMatch[1].trim() } };
+      // Extract file path and optionally content
+      const patterns = [
+        /create (?:new )?(?:a )?file\s+(?:called\s+|named\s+)?([^\s]+)/i,
+        /new file\s+([^\s]+)/i,
+        /make (?:a )?file\s+([^\s]+)/i,
+      ];
+
+      for (const pattern of patterns) {
+        const match = trimmed.match(pattern);
+        if (match && match[1]) {
+          return { type: 'create-file', arguments: { path: match[1].trim() } };
+        }
+      }
+    }
+
+    if (matched.type === 'modify-file') {
+      const patterns = [
+        /(?:modify|update|change|edit) (?:the )?file\s+([^\s]+)/i,
+        /write to (?:file\s+)?([^\s]+)/i,
+      ];
+
+      for (const pattern of patterns) {
+        const match = trimmed.match(pattern);
+        if (match && match[1]) {
+          return { type: 'modify-file', arguments: { path: match[1].trim() } };
+        }
+      }
+    }
+
+    if (matched.type === 'delete-file') {
+      const patterns = [
+        /(?:delete|remove) (?:the )?file\s+([^\s]+)/i,
+        /rm\s+([^\s]+)/i,
+      ];
+
+      for (const pattern of patterns) {
+        const match = trimmed.match(pattern);
+        if (match && match[1]) {
+          return { type: 'delete-file', arguments: { path: match[1].trim() } };
+        }
+      }
+    }
+
+    if (matched.type === 'run-command') {
+      const patterns = [
+        /run command:?\s+(.+)/i,
+        /execute command:?\s+(.+)/i,
+        /shell:?\s+(.+)/i,
+      ];
+
+      for (const pattern of patterns) {
+        const match = trimmed.match(pattern);
+        if (match && match[1]) {
+          return { type: 'run-command', arguments: { command: match[1].trim() } };
+        }
       }
     }
 

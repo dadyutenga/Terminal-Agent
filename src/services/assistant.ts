@@ -8,6 +8,9 @@ import type { PatchEngine } from '../patches/patch-engine.js';
 import type { SessionMemory } from '../memory/session-memory.js';
 import type { IntentParser, ParsedIntent } from '../intents/intent-parser.js';
 import type { FileReader } from '../files/file-reader.js';
+import type { ToolRegistry } from '../tools/registry.js';
+import type { ApprovalManager } from '../tools/approval-manager.js';
+import type { PlanGenerator } from '../tools/plan-generator.js';
 
 export type AssistantDependencies = {
   intents: IntentParser;
@@ -18,6 +21,10 @@ export type AssistantDependencies = {
   patches: PatchEngine;
   memory: SessionMemory;
   fileReader: FileReader;
+  toolRegistry: ToolRegistry;
+  approvalManager: ApprovalManager;
+  planGenerator: PlanGenerator;
+  projectRoot: string;
 };
 
 export class ASIATAssistant {
@@ -39,8 +46,14 @@ export class ASIATAssistant {
         return this.handleGitIntent(intent);
       case 'create-file':
         return this.handleCreateFile(intent);
+      case 'modify-file':
+        return this.handleModifyFile(intent);
+      case 'delete-file':
+        return this.handleDeleteFile(intent);
       case 'read-file':
         return this.handleReadFile(intent);
+      case 'run-command':
+        return this.handleRunCommand(intent);
       case 'explain':
         return this.handleExplain(message, intent);
       case 'refactor':
@@ -156,6 +169,94 @@ export class ASIATAssistant {
       '```' + language,
       result.content,
       '```',
+    ].join('\n');
+  }
+
+  /**
+   * Handle modify-file intent using the tool system
+   * Shows a preview and requires approval before modifying
+   */
+  private async handleModifyFile(intent: ParsedIntent): Promise<string> {
+    const filePath = intent.arguments?.path;
+    
+    if (!filePath) {
+      return 'Please specify a file path to modify. Example: "modify src/index.ts"';
+    }
+
+    // For now, return a message indicating this requires the agentic workflow
+    // The full implementation will be done through the approval UI
+    return [
+      `📝 To modify ${filePath}, please provide the new content or specific changes.`,
+      ``,
+      `I can help you:`,
+      `  • Replace specific text`,
+      `  • Add new code sections`,
+      `  • Refactor existing code`,
+      ``,
+      `Tell me what changes you'd like to make!`,
+    ].join('\n');
+  }
+
+  /**
+   * Handle delete-file intent using the tool system
+   * Shows a preview and requires approval before deleting
+   */
+  private async handleDeleteFile(intent: ParsedIntent): Promise<string> {
+    const filePath = intent.arguments?.path;
+    
+    if (!filePath) {
+      return 'Please specify a file path to delete. Example: "delete temp.txt"';
+    }
+
+    // Generate a deletion plan
+    const plan = this.deps.planGenerator.generateDeleteFilePlan(filePath, true);
+    
+    // Generate preview
+    const preview = await this.deps.approvalManager.generatePlanPreview(plan, {
+      projectRoot: this.deps.projectRoot,
+      currentDir: process.cwd(),
+    });
+
+    return [
+      preview,
+      '',
+      '⚠️ This action requires approval.',
+      'Use "yes" to proceed or "no" to cancel.',
+      '',
+      'Note: A backup will be created before deletion.',
+    ].join('\n');
+  }
+
+  /**
+   * Handle run-command intent using the tool system
+   * Shows a preview and requires approval before executing
+   */
+  private async handleRunCommand(intent: ParsedIntent): Promise<string> {
+    const command = intent.arguments?.command;
+    
+    if (!command) {
+      return 'Please specify a command to run. Example: "run command: npm test"';
+    }
+
+    // Parse command and args
+    const parts = command.split(' ');
+    const cmd = parts[0];
+    const args = parts.slice(1);
+
+    // Generate a command execution plan
+    const plan = this.deps.planGenerator.generateRunCommandPlan(cmd, args);
+    
+    // Generate preview
+    const preview = await this.deps.approvalManager.generatePlanPreview(plan, {
+      projectRoot: this.deps.projectRoot,
+      currentDir: process.cwd(),
+    });
+
+    return [
+      preview,
+      '',
+      '⚠️ This action requires approval.',
+      'Use "yes" to proceed or "no" to cancel.',
     ].join('\n');
   }
 

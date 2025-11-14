@@ -81,7 +81,7 @@ export abstract class BaseTool<TInput = any, TOutput = any>
   /**
    * Helper: Create an error result
    */
-  protected error(error: string, metadata?: Record<string, any>): ToolResult<TOutput> {
+  protected error<T = TOutput>(error: string, metadata?: Record<string, any>): ToolResult<T> {
     return {
       status: 'error',
       error,

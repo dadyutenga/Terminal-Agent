@@ -8,6 +8,7 @@ import { CommandExecutor } from '../executor/command-executor.js';
 import { SessionMemory } from '../memory/session-memory.js';
 import { ASIATAssistant } from './assistant.js';
 import { FileReader } from '../files/file-reader.js';
+import { ToolRegistry, ApprovalManager, PlanGenerator, initializeToolSystem } from '../tools/index.js';
 
 export type RuntimeContext = {
   config: ASIATConfig;
@@ -19,6 +20,9 @@ export type RuntimeContext = {
   executor: CommandExecutor;
   memory: SessionMemory;
   fileReader: FileReader;
+  toolRegistry: ToolRegistry;
+  approvalManager: ApprovalManager;
+  planGenerator: PlanGenerator;
   assistant: ASIATAssistant;
 };
 
@@ -31,7 +35,26 @@ export const createRuntimeContext = async (config: ASIATConfig): Promise<Runtime
   const executor = new CommandExecutor(config.projectRoot);
   const memory = new SessionMemory();
   const fileReader = new FileReader(config.projectRoot);
-  const assistant = new ASIATAssistant({ intents, indexer, git, llm, patches, executor, memory, fileReader });
+  
+  // Initialize tool system
+  const toolRegistry = initializeToolSystem();
+  const approvalManager = new ApprovalManager(toolRegistry);
+  const planGenerator = new PlanGenerator(toolRegistry);
+  
+  const assistant = new ASIATAssistant({ 
+    intents, 
+    indexer, 
+    git, 
+    llm, 
+    patches, 
+    executor, 
+    memory, 
+    fileReader,
+    toolRegistry,
+    approvalManager,
+    planGenerator,
+    projectRoot: config.projectRoot,
+  });
 
   await indexer.initialize();
   await indexer.indexProject();
@@ -46,6 +69,9 @@ export const createRuntimeContext = async (config: ASIATConfig): Promise<Runtime
     executor,
     memory,
     fileReader,
+    toolRegistry,
+    approvalManager,
+    planGenerator,
     assistant,
   };
 };
