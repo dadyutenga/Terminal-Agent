@@ -5,11 +5,11 @@ import { InputBar } from './components/InputBar.js';
 import type { RuntimeContext } from '../services/context.js';
 import type { MemoryEntry } from '../memory/session-memory.js';
 
-export type TermiMindAppProps = {
+export type ASIATAppProps = {
   context: RuntimeContext;
 };
 
-export const TermiMindApp: React.FC<TermiMindAppProps> = ({ context }) => {
+export const ASIATApp: React.FC<ASIATAppProps> = ({ context }) => {
   const [messages, setMessages] = useState<MemoryEntry[]>(context.memory.list());
   const [input, setInput] = useState('');
   const [status, setStatus] = useState<string>('Ready');
@@ -43,7 +43,7 @@ export const TermiMindApp: React.FC<TermiMindAppProps> = ({ context }) => {
   return (
     <Box flexDirection="column" height="100%">
       <Box paddingX={1} paddingY={0} justifyContent="space-between">
-        <Text color="cyan">TermiMind</Text>
+        <Text color="cyan">ASIAT</Text>
         <Text color={busy ? 'yellow' : 'gray'}>{status}</Text>
       </Box>
       <ChatView messages={messages} />

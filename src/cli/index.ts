@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
-import { loadConfig, TermiMindConfig } from '../config/index.js';
+import { loadConfig, ASIATConfig } from '../config/index.js';
 import { runTui } from '../tui/index.js';
 import { createRuntimeContext } from '../services/context.js';
 
@@ -28,7 +28,7 @@ program
   .option('--llm-model <model>', 'LLM model identifier')
   .option('--llm-base-url <url>', 'Custom LLM base URL')
   .action(async (options) => {
-    const configOverrides: Partial<TermiMindConfig> = {};
+    const configOverrides: Partial<ASIATConfig> = {};
     
     if (options.project) {
       configOverrides.projectRoot = options.project;

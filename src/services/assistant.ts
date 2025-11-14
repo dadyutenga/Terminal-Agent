@@ -18,7 +18,7 @@ export type AssistantDependencies = {
   memory: SessionMemory;
 };
 
-export class TermiMindAssistant {
+export class ASIATAssistant {
   private pendingPatch: string | null = null;
 
   constructor(private readonly deps: AssistantDependencies) {}
@@ -193,7 +193,7 @@ export class TermiMindAssistant {
 
     const response = await this.deps.llm.chat(
       this.buildMessages(
-        'You are TermiMind, a pragmatic TypeScript pair-programmer that answers succinctly with actionable guidance.',
+        'You are ASIAT, a pragmatic TypeScript pair-programmer that answers succinctly with actionable guidance.',
         `User request: ${message}${contextBlocks ? `\n\nIndexed context:\n${contextBlocks}` : ''}`
       )
     );

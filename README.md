@@ -1,6 +1,6 @@
-# TermiMind
+# ASIAT
 
-TermiMind is a terminal-native, Ink-powered TUI coding assistant that orchestrates code understanding, editing, and project automation for local repositories.
+ASIAT is a terminal-native, Ink-powered TUI coding assistant that orchestrates code understanding, editing, and project automation for local repositories.
 
 ## Features
 
@@ -30,9 +30,9 @@ npm run dev -- --project /path/to/your/project
 Set the following environment variables as needed:
 
 - `OPENAI_API_KEY` – required for OpenAI provider.
-- `TERMIMIND_LLM_PROVIDER` – `openai` (default) or `llama`.
-- `TERMIMIND_LLM_MODEL` – override default model name.
-- `TERMIMIND_LLM_BASE_URL` – custom endpoint for non-OpenAI providers.
+- `ASIAT_LLM_PROVIDER` – `openai` (default) or `llama`.
+- `ASIAT_LLM_MODEL` – override default model name.
+- `ASIAT_LLM_BASE_URL` – custom endpoint for non-OpenAI providers.
 
 ## Architecture Overview
 
@@ -47,7 +47,7 @@ Set the following environment variables as needed:
 ## Development Notes
 
 - The SQLite database is stored in `data/index.db` by default.
-- Embeddings are deterministic and CPU friendly so TermiMind works offline.
+- Embeddings are deterministic and CPU friendly so ASIAT works offline.
 - Extend intent handling in `src/tui/app.tsx` to add new behaviors.
 - The patch engine expects standard unified diff format when applying patches.
 
