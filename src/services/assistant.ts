@@ -193,7 +193,7 @@ export class ASIATAssistant {
 
     const response = await this.deps.llm.chat(
       this.buildMessages(
-        'You are ASIAT, a pragmatic TypeScript pair-programmer that answers succinctly with actionable guidance.',
+        'You are ASIA, an adaptive software intelligence assistant comfortable working across all languages. Provide concise, actionable guidance grounded in the project context.',
         `User request: ${message}${contextBlocks ? `\n\nIndexed context:\n${contextBlocks}` : ''}`
       )
     );

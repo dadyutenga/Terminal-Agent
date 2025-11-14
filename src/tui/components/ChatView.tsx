@@ -12,15 +12,21 @@ const roleColor: Record<MemoryEntry['role'], string> = {
   assistant: 'magenta',
 };
 
+const roleLabel: Record<MemoryEntry['role'], string> = {
+  system: 'SYSTEM',
+  user: 'USER',
+  assistant: 'ASIA',
+};
+
 export const ChatView: React.FC<ChatViewProps> = ({ messages }) => {
   return (
     <Box flexDirection="column" paddingX={1} flexGrow={1}>
       {messages.length === 0 ? (
-        <Text color="gray">Welcome to ASIAT! Ask me anything about your codebase.</Text>
+        <Text color="gray">Welcome to ASIA! Ask me anything about your codebase.</Text>
       ) : (
         messages.map((message, index) => (
           <Box key={`${message.timestamp}-${index}`} flexDirection="column" marginBottom={1}>
-            <Text color={roleColor[message.role]}>{`${message.role.toUpperCase()}`}</Text>
+            <Text color={roleColor[message.role]}>{roleLabel[message.role]}</Text>
             <Text>{message.content}</Text>
           </Box>
         ))

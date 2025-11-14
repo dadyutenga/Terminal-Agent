@@ -174,22 +174,23 @@ export const ASIATApp: React.FC<ASIATAppProps> = ({ context }) => {
   );
 
   const handleSubmit = useCallback(
-    async (value: string) => {
-      if (!value.trim() || busy) return;
+    async (value: string): Promise<boolean> => {
+      if (!value.trim() || busy) return false;
 
       if (value.startsWith('/')) {
         const { command, args } = resolveCommand(value);
-        setInput('');
         if (!command) {
+          setInput('');
           appendMessage({
             role: 'system',
             content: `Unknown command: ${value}`,
             timestamp: Date.now(),
           });
-          return;
+          return true;
         }
+        setInput('');
         await runCommand(command, args, value);
-        return;
+        return true;
       }
 
       setBusy(true);
@@ -201,10 +202,12 @@ export const ASIATApp: React.FC<ASIATAppProps> = ({ context }) => {
         const response = await context.assistant.handleMessage(value);
         appendMessage({ role: 'assistant', content: response, timestamp: Date.now() });
         setStatus('Ready');
+        return true;
       } catch (error) {
         const message = (error as Error).message;
         appendMessage({ role: 'assistant', content: `Error: ${message}`, timestamp: Date.now() });
         setStatus('Error');
+        return true;
       } finally {
         setBusy(false);
       }
@@ -215,7 +218,7 @@ export const ASIATApp: React.FC<ASIATAppProps> = ({ context }) => {
   return (
     <Box flexDirection="column" height="100%">
       <Box paddingX={1} paddingY={0} justifyContent="space-between">
-        <Text color="cyan">ASIAT</Text>
+        <Text color="cyan">ASIA</Text>
         <Text color={busy ? 'yellow' : 'gray'}>{status}</Text>
       </Box>
       <ChatView messages={messages} />
