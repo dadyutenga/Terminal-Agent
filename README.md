@@ -16,15 +16,15 @@ TermiMind is a terminal-native, Ink-powered TUI coding assistant that orchestrat
 ## Getting Started
 
 ```bash
-pnpm install
-pnpm run build
-pnpm exec asiat --project /path/to/your/project
+npm install
+npm run build
+npx asiat --project /path/to/your/project
 ```
 
 During development you can run the CLI directly with TypeScript support:
 
 ```bash
-pnpm run dev -- --project /path/to/your/project
+npm run dev -- --project /path/to/your/project
 ```
 
 Set the following environment variables as needed:
