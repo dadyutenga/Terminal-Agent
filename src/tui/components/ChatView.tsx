@@ -16,8 +16,8 @@ const roleColor: Record<MemoryEntry['role'], string> = {
 
 const roleLabel: Record<MemoryEntry['role'], string> = {
   system: '⚙️  SYSTEM',
-  user: '� USER',
-  assistant: '🤖 ASIA',
+  user: '👩‍💻 USER',
+  assistant: 'ASIA',
 };
 
 const roleBorderColor: Record<MemoryEntry['role'], string> = {
@@ -57,7 +57,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ messages, isProcessing = fal
       {messages.length === 0 ? (
         <Box flexDirection="column" paddingY={1}>
           <Text color="cyan" bold>
-            ✨ Welcome to ASIA! 🚀
+            👩‍💻 Welcome to ASIA! 🚀
           </Text>
           <Text color="gray">Ask me anything about your codebase, and I'll help you out! 💡</Text>
         </Box>

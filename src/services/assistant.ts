@@ -23,6 +23,10 @@ export class ASIATAssistant {
 
   constructor(private readonly deps: AssistantDependencies) {}
 
+  updateLlm(newLlm: AiManager): void {
+    this.deps.llm = newLlm;
+  }
+
   async handleMessage(message: string): Promise<string> {
     const intent = this.deps.intents.parse(message);
 

@@ -1,4 +1,4 @@
-import type { CommandExecuteArgs, SlashCommand } from './types.js';
+import type { CommandExecuteArgs, SlashCommand, SlashCommandHelpers } from './types.js';
 
 const formatStatus = (args: CommandExecuteArgs) => {
   const status = args.context.git.status();
@@ -15,7 +15,7 @@ const formatStatus = (args: CommandExecuteArgs) => {
   ].join('\n');
 };
 
-export const createSlashCommands = (helpers: Omit<CommandExecuteArgs, 'args' | 'rawInput'>): SlashCommand[] => {
+export const createSlashCommands = (helpers: SlashCommandHelpers): SlashCommand[] => {
   const commands: SlashCommand[] = [];
 
   const helpCommand: SlashCommand = {
@@ -94,7 +94,49 @@ export const createSlashCommands = (helpers: Omit<CommandExecuteArgs, 'args' | '
     },
   };
 
-  commands.push(helpCommand, clearCommand, gitStatusCommand, reindexCommand, configCommand);
+  const modelCommand: SlashCommand = {
+    id: 'model',
+    name: 'model',
+    description: 'Open model selector to change the AI model.',
+    aliases: ['models'],
+    keywords: ['ai', 'llm', 'switch'],
+    run: (args) => {
+      if (args.setShowModelSelector) {
+        args.setShowModelSelector(true);
+      } else if (helpers.setShowModelSelector) {
+        helpers.setShowModelSelector(true);
+      } else {
+        helpers.appendMessage({
+          role: 'system',
+          content: 'Model selector not available in this context.',
+          timestamp: Date.now(),
+        });
+      }
+    },
+  };
+
+  const providerCommand: SlashCommand = {
+    id: 'provider',
+    name: 'provider',
+    description: 'Open provider selector to switch AI provider and configure API key.',
+    aliases: ['providers'],
+    keywords: ['ai', 'llm', 'switch', 'openai', 'gemini', 'claude', 'anthropic', 'ollama'],
+    run: (args) => {
+      if (args.setShowProviderSelector) {
+        args.setShowProviderSelector(true);
+      } else if (helpers.setShowProviderSelector) {
+        helpers.setShowProviderSelector(true);
+      } else {
+        helpers.appendMessage({
+          role: 'system',
+          content: 'Provider selector not available in this context.',
+          timestamp: Date.now(),
+        });
+      }
+    },
+  };
+
+  commands.push(helpCommand, clearCommand, gitStatusCommand, reindexCommand, configCommand, modelCommand, providerCommand);
 
   return commands;
 };

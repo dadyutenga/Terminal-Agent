@@ -1,13 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
-import Gradient from 'ink-gradient';
 import { ChatView } from './components/ChatView.js';
 import { InputBar } from './components/InputBar.js';
 import { CommandPalette } from './components/CommandPalette.js';
+import { ModelSelector } from './components/ModelSelector.js';
+import { ProviderSelector } from './components/ProviderSelector.js';
 import type { RuntimeContext } from '../services/context.js';
 import type { MemoryEntry } from '../memory/session-memory.js';
 import { createSlashCommands } from './slash-commands/commands.js';
 import type { SlashCommand } from './slash-commands/types.js';
+import type { ProviderId } from '../ai/types.js';
+import { AiManager } from '../ai/ai-manager.js';
 
 export type ASIATAppProps = {
   context: RuntimeContext;
@@ -22,6 +25,10 @@ export const ASIATApp: React.FC<ASIATAppProps> = ({ context }) => {
   const [busy, setBusy] = useState(false);
   const [isPaletteOpen, setPaletteOpen] = useState(false);
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
+  const [showModelSelector, setShowModelSelector] = useState(false);
+  const [showProviderSelector, setShowProviderSelector] = useState(false);
+  const [currentProvider, setCurrentProvider] = useState<ProviderId>(context.llm.providerId);
+  const [currentModel, setCurrentModel] = useState<string>(context.llm.model);
 
   const appendMessage = useCallback(
     (entry: MemoryEntry) => {
@@ -37,6 +44,8 @@ export const ASIATApp: React.FC<ASIATAppProps> = ({ context }) => {
       appendMessage,
       setMessages,
       setStatus,
+      setShowModelSelector,
+      setShowProviderSelector,
     }),
     [appendMessage, context, setMessages, setStatus]
   );
@@ -211,26 +220,95 @@ export const ASIATApp: React.FC<ASIATAppProps> = ({ context }) => {
     [appendMessage, busy, context.assistant, resolveCommand, runCommand]
   );
 
+  const handleModelSelect = useCallback(
+    (model: string) => {
+      setCurrentModel(model);
+      context.config.llm.model = model;
+      setShowModelSelector(false);
+      appendMessage({
+        role: 'system',
+        content: `✅ Model changed to: ${model}`,
+        timestamp: Date.now(),
+      });
+      setStatus(`Ready - ${currentProvider} (${model})`);
+    },
+    [appendMessage, context.config.llm, currentProvider]
+  );
+
+  const handleProviderSelect = useCallback(
+    async (providerId: ProviderId, apiKey?: string) => {
+      setShowProviderSelector(false);
+      setStatus('Switching provider...');
+      
+      try {
+        if (apiKey) {
+          context.config.llm.apiKey = apiKey;
+        }
+        context.config.llm.provider = providerId;
+        
+        // Recreate the AI manager with new provider
+        const newAiManager = new AiManager(context.config.llm);
+        context.llm = newAiManager;
+        context.assistant.updateLlm(newAiManager);
+        
+        setCurrentProvider(providerId);
+        setCurrentModel(newAiManager.model);
+        
+        appendMessage({
+          role: 'system',
+          content: `✅ Provider changed to: ${providerId} (${newAiManager.model})`,
+          timestamp: Date.now(),
+        });
+        setStatus(`Ready - ${providerId} (${newAiManager.model})`);
+      } catch (error) {
+        const message = (error as Error).message;
+        appendMessage({
+          role: 'system',
+          content: `❌ Failed to switch provider: ${message}`,
+          timestamp: Date.now(),
+        });
+        setStatus('Error');
+      }
+    },
+    [appendMessage, context]
+  );
+
   return (
     <Box flexDirection="column" height="100%">
-      <Box paddingX={1} paddingY={0} justifyContent="space-between">
-        <Gradient name="rainbow">
-          <Text bold>🤖 ASIA - AI Coding Assistant</Text>
-        </Gradient>
-        <Text color={busy ? 'yellow' : 'gray'}>
-          {busy ? '⏳ ' : '✅ '}
-          {status}
-        </Text>
-      </Box>
       <ChatView messages={messages} isProcessing={busy} />
       <Box flexDirection="column">
-        <InputBar value={input} onChange={setInput} onSubmit={handleSubmit} placeholder="Type a request" />
-        {isPaletteOpen && (
-          <CommandPalette
-            commands={filteredCommands}
-            selectedIndex={selectedCommandIndex}
-            query={commandQuery.trim()}
+        {showModelSelector && (
+          <ModelSelector
+            models={context.llm.availableModels}
+            currentModel={currentModel}
+            providerName={currentProvider}
+            onSelect={handleModelSelect}
+            onCancel={() => setShowModelSelector(false)}
           />
+        )}
+        {showProviderSelector && (
+          <ProviderSelector
+            providers={AiManager.listProviders().map((p) => ({
+              id: p.id,
+              label: p.label,
+              requiresApiKey: p.requiresApiKey,
+            }))}
+            currentProvider={currentProvider}
+            onSelect={handleProviderSelect}
+            onCancel={() => setShowProviderSelector(false)}
+          />
+        )}
+        {!showModelSelector && !showProviderSelector && (
+          <>
+            <InputBar value={input} onChange={setInput} onSubmit={handleSubmit} placeholder="Type a request" />
+            {isPaletteOpen && (
+              <CommandPalette
+                commands={filteredCommands}
+                selectedIndex={selectedCommandIndex}
+                query={commandQuery.trim()}
+              />
+            )}
+          </>
         )}
       </Box>
       <Box paddingX={1} paddingY={0}>
