@@ -82,7 +82,7 @@ export const createSlashCommands = (helpers: Omit<CommandExecuteArgs, 'args' | '
   const configCommand: SlashCommand = {
     id: 'show-config',
     name: 'show-config',
-    description: 'Print the active ASIAT configuration.',
+    description: 'Print the active ASIA configuration.',
     aliases: ['config'],
     run: () => {
       const { projectRoot, databasePath } = helpers.context.config;
