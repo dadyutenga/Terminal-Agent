@@ -15,7 +15,7 @@ export const InputBar: React.FC<InputBarProps> = ({ value, onChange, onSubmit, p
       <Text color="cyan">❯ </Text>
       <TextInput
         value={value}
-        placeholder={placeholder ?? 'Ask TermiMind...'}
+        placeholder={placeholder ?? 'Ask ASIAT...'}
         onChange={onChange}
         onSubmit={onSubmit}
       />

@@ -1,7 +1,7 @@
 {
-  "name": "termimind",
+  "name": "asiat",
   "version": "0.1.0",
-  "description": "TermiMind - A TUI-based agentic coding assistant.",
+  "description": "ASIAT - A TUI-based agentic coding assistant.",
   "type": "module",
   "main": "dist/index.js",
   "bin": {

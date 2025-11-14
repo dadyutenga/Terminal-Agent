@@ -1,4 +1,4 @@
-import { TermiMindConfig } from '../config/index.js';
+import { ASIATConfig } from '../config/index.js';
 import { IntentParser } from '../intents/intent-parser.js';
 import { CodeIndexer } from '../indexing/code-indexer.js';
 import { GitManager } from '../git/git-manager.js';
@@ -6,10 +6,10 @@ import { LlmGateway } from '../llm/llm-gateway.js';
 import { PatchEngine } from '../patches/patch-engine.js';
 import { CommandExecutor } from '../executor/command-executor.js';
 import { SessionMemory } from '../memory/session-memory.js';
-import { TermiMindAssistant } from './assistant.js';
+import { ASIATAssistant } from './assistant.js';
 
 export type RuntimeContext = {
-  config: TermiMindConfig;
+  config: ASIATConfig;
   intents: IntentParser;
   indexer: CodeIndexer;
   git: GitManager;
@@ -17,10 +17,10 @@ export type RuntimeContext = {
   patches: PatchEngine;
   executor: CommandExecutor;
   memory: SessionMemory;
-  assistant: TermiMindAssistant;
+  assistant: ASIATAssistant;
 };
 
-export const createRuntimeContext = async (config: TermiMindConfig): Promise<RuntimeContext> => {
+export const createRuntimeContext = async (config: ASIATConfig): Promise<RuntimeContext> => {
   const intents = new IntentParser();
   const indexer = new CodeIndexer(config);
   const git = new GitManager(config.projectRoot);
@@ -28,7 +28,7 @@ export const createRuntimeContext = async (config: TermiMindConfig): Promise<Run
   const patches = new PatchEngine(config.projectRoot);
   const executor = new CommandExecutor(config.projectRoot);
   const memory = new SessionMemory();
-  const assistant = new TermiMindAssistant({ intents, indexer, git, llm, patches, executor, memory });
+  const assistant = new ASIATAssistant({ intents, indexer, git, llm, patches, executor, memory });
 
   await indexer.initialize();
   await indexer.indexProject();

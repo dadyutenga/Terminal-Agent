@@ -12,7 +12,7 @@ import {
   SyntaxKind,
   VariableDeclaration,
 } from 'ts-morph';
-import type { TermiMindConfig } from '../config/index.js';
+import type { ASIATConfig } from '../config/index.js';
 import { cosineSimilarity } from '../utils/math.js';
 
 export type IndexedFile = {
@@ -48,7 +48,7 @@ export class CodeIndexer {
   private db?: Database;
   private project?: Project;
 
-  constructor(config: TermiMindConfig) {
+  constructor(config: ASIATConfig) {
     this.projectRoot = config.projectRoot;
     this.databasePath = config.databasePath;
   }

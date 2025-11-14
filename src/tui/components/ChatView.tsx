@@ -16,7 +16,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ messages }) => {
   return (
     <Box flexDirection="column" paddingX={1} flexGrow={1}>
       {messages.length === 0 ? (
-        <Text color="gray">Welcome to TermiMind! Ask me anything about your codebase.</Text>
+        <Text color="gray">Welcome to ASIAT! Ask me anything about your codebase.</Text>
       ) : (
         messages.map((message, index) => (
           <Box key={`${message.timestamp}-${index}`} flexDirection="column" marginBottom={1}>
