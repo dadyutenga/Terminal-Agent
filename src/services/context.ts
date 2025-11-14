@@ -31,7 +31,7 @@ export const createRuntimeContext = async (config: TermiMindConfig): Promise<Run
   const assistant = new TermiMindAssistant({ intents, indexer, git, llm, patches, executor, memory });
 
   await indexer.initialize();
-  indexer.indexProject();
+  await indexer.indexProject();
 
   return {
     config,

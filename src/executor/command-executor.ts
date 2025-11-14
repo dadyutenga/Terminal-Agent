@@ -45,16 +45,6 @@ export class CommandExecutor {
       throw new Error(`Script "${script}" is not defined in package.json`);
     }
 
-    // prefer pnpm, fallback to npm
-    try {
-      return await this.run('pnpm', ['run', script]);
-    } catch (error) {
-      const message = (error as Error).message;
-      if (!/ENOENT/.test(message)) {
-        throw error;
-      }
-    }
-
     return this.run('npm', ['run', script]);
   }
 

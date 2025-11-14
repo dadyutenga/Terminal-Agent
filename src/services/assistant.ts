@@ -119,14 +119,14 @@ export class TermiMindAssistant {
   private async handleCreateFile(intent: ParsedIntent): Promise<string> {
     const targetPath = intent.arguments?.path ?? `notes/${uuid()}.md`;
     this.deps.patches.writeFile(targetPath, '');
-    this.deps.indexer.indexProject();
+    await this.deps.indexer.indexProject();
     return `Created file ${targetPath}`;
   }
 
   private async handleExplain(message: string, intent: ParsedIntent): Promise<string> {
     const focusPath = intent.arguments?.path;
     const focusSymbol = intent.arguments?.symbol;
-    const related = this.deps.indexer.search(focusPath ?? message, 4);
+    const related = await this.deps.indexer.search(focusPath ?? message, 4);
 
     if (related.length === 0) {
       return 'No relevant files found to explain.';
@@ -152,7 +152,7 @@ export class TermiMindAssistant {
 
   private async handleRefactor(message: string, intent: ParsedIntent): Promise<string> {
     const focusPath = intent.arguments?.path;
-    const related = this.deps.indexer.search(focusPath ?? message, 4);
+    const related = await this.deps.indexer.search(focusPath ?? message, 4);
 
     if (related.length === 0) {
       return 'No relevant files found to refactor.';
@@ -183,7 +183,7 @@ export class TermiMindAssistant {
   }
 
   private async handleGeneralConversation(message: string): Promise<string> {
-    const related = this.deps.indexer.search(message, 3);
+    const related = await this.deps.indexer.search(message, 3);
     const contextBlocks = related
       .map((file) => {
         const summary = this.deps.indexer.describeFile(file.path);
@@ -208,7 +208,7 @@ export class TermiMindAssistant {
 
     try {
       this.deps.patches.applyUnifiedDiff(this.pendingPatch);
-      this.deps.indexer.indexProject();
+      await this.deps.indexer.indexProject();
       const appliedSummary = this.pendingPatch.split('\n').slice(0, 20).join('\n');
       this.pendingPatch = null;
       return `Patch applied successfully. Preview:\n${appliedSummary}`;

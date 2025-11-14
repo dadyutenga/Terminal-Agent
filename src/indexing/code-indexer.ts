@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import Database from 'better-sqlite3';
+import sqlite3 from 'sqlite3';
+import { open, type Database } from 'sqlite';
 import {
   ClassDeclaration,
   FunctionDeclaration,
@@ -44,7 +45,7 @@ const computeEmbedding = (text: string): number[] => {
 export class CodeIndexer {
   private readonly projectRoot: string;
   private readonly databasePath: string;
-  private db?: Database.Database;
+  private db?: Database;
   private project?: Project;
 
   constructor(config: TermiMindConfig) {
@@ -54,19 +55,21 @@ export class CodeIndexer {
 
   async initialize(): Promise<void> {
     ensureDir(this.databasePath);
-    this.db = new Database(this.databasePath);
-    this.db.pragma('journal_mode = WAL');
-    this.db
-      .prepare(
-        `CREATE TABLE IF NOT EXISTS files (
-          path TEXT PRIMARY KEY,
-          symbol_count INTEGER,
-          exports TEXT,
-          content TEXT,
-          embedding TEXT
-        )`
+    this.db = await open({
+      filename: this.databasePath,
+      driver: sqlite3.Database,
+    });
+
+    await this.db.exec('PRAGMA journal_mode = WAL');
+    await this.db.exec(`
+      CREATE TABLE IF NOT EXISTS files (
+        path TEXT PRIMARY KEY,
+        symbol_count INTEGER,
+        exports TEXT,
+        content TEXT,
+        embedding TEXT
       )
-      .run();
+    `);
 
     const options: ProjectOptions = {
       skipAddingFilesFromTsConfig: true,
@@ -85,45 +88,55 @@ export class CodeIndexer {
     return fs.existsSync(tsconfigPath) ? tsconfigPath : undefined;
   }
 
-  indexProject(): void {
+  async indexProject(): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
     if (!this.project) throw new Error('Project not initialized');
 
     const filePaths = this.walkProject();
-    const insert = this.db.prepare(
-      `INSERT OR REPLACE INTO files(path, symbol_count, exports, content, embedding) VALUES (@path, @symbol_count, @exports, @content, @embedding)`
+    const insert = await this.db.prepare(
+      `INSERT OR REPLACE INTO files(path, symbol_count, exports, content, embedding) VALUES (?, ?, ?, ?, ?)`
     );
 
-    for (const filePath of filePaths) {
-      const content = fs.readFileSync(filePath, 'utf-8');
-      const relativePath = path.relative(this.projectRoot, filePath);
-      const sourceFile = this.project.addSourceFileAtPathIfExists(filePath);
-      const exports = sourceFile ? this.extractExports(sourceFile) : [];
-      const embedding = computeEmbedding(content);
+    try {
+      for (const filePath of filePaths) {
+        const content = fs.readFileSync(filePath, 'utf-8');
+        const relativePath = path.relative(this.projectRoot, filePath);
+        const sourceFile = this.project.addSourceFileAtPathIfExists(filePath);
+        const exports = sourceFile ? this.extractExports(sourceFile) : [];
+        const embedding = computeEmbedding(content);
 
-      insert.run({
-        path: relativePath,
-        symbol_count: content.length,
-        exports: JSON.stringify(exports),
-        content,
-        embedding: JSON.stringify(embedding),
-      });
+        await insert.run(
+          relativePath,
+          content.length,
+          JSON.stringify(exports),
+          content,
+          JSON.stringify(embedding)
+        );
+      }
+    } finally {
+      await insert.finalize();
     }
   }
 
-  search(query: string, limit = 5): IndexedFile[] {
+  async search(query: string, limit = 5): Promise<IndexedFile[]> {
     if (!this.db) throw new Error('Database not initialized');
     const embedding = computeEmbedding(query);
-    const rows = this.db.prepare('SELECT * FROM files').all();
+    const rows = await this.db.all<{
+      path: string;
+      symbol_count: number;
+      exports: string;
+      content: string;
+      embedding: string;
+    }>('SELECT * FROM files');
     const scored = rows
-      .map((row: any) => {
+      .map((row) => {
         const vector = JSON.parse(row.embedding) as number[];
         const score = cosineSimilarity(embedding, vector);
         return {
-          path: row.path as string,
-          symbolCount: row.symbol_count as number,
+          path: row.path,
+          symbolCount: row.symbol_count,
           exports: JSON.parse(row.exports) as string[],
-          content: row.content as string,
+          content: row.content,
           embedding: vector,
           score,
         };
