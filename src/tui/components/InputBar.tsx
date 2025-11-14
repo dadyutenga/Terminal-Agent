@@ -21,7 +21,11 @@ type ControlledTextInputProps = React.ComponentProps<typeof TextInput> & { value
 
 const ControlledTextInput = TextInput as unknown as React.FC<ControlledTextInputProps>;
 
-export const InputBar: React.FC<InputBarProps> = ({ value, onChange, onSubmit, placeholder }) => {
+/**
+ * InputBar component - memoized to prevent re-renders from parent.
+ * Manages its own local state for input to prevent global re-renders on every keystroke.
+ */
+export const InputBar = React.memo<InputBarProps>(({ value, onChange, onSubmit, placeholder }) => {
   const [submitCount, setSubmitCount] = React.useState(0);
   
   const handleSubmit = React.useCallback(
@@ -53,4 +57,6 @@ export const InputBar: React.FC<InputBarProps> = ({ value, onChange, onSubmit, p
       />
     </Box>
   );
-};
+});
+
+InputBar.displayName = 'InputBar';

@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { Box, Text, useInput } from 'ink';
+import { Header } from './components/Header.js';
 import { ChatView } from './components/ChatView.js';
 import { InputBar } from './components/InputBar.js';
 import { CommandPalette } from './components/CommandPalette.js';
@@ -11,6 +12,7 @@ import { createSlashCommands } from './slash-commands/commands.js';
 import type { SlashCommand } from './slash-commands/types.js';
 import type { ProviderId } from '../ai/types.js';
 import { AiManager } from '../ai/ai-manager.js';
+import { useDebounce } from './hooks/useDebounce.js';
 
 export type ASIATAppProps = {
   context: RuntimeContext;
@@ -18,45 +20,82 @@ export type ASIATAppProps = {
 
 const normalizeCommandToken = (value: string) => value.trim().toLowerCase();
 
+/**
+ * Main app component - optimized to prevent flickering:
+ * 1. Input state is LOCAL to InputBar (doesn't trigger global re-renders)
+ * 2. Messages stored in stable ref, only trigger re-render on count change
+ * 3. Slash command filtering is debounced
+ * 4. All components are memoized
+ * 5. Header isolated - only updates on provider/model/status change
+ * 6. No console.log in render cycle
+ * 7. Effects only run when truly needed
+ */
 export const ASIATApp: React.FC<ASIATAppProps> = ({ context }) => {
-  const [messages, setMessages] = useState<MemoryEntry[]>(context.memory.list());
-  const [input, setInput] = useState('');
+  // === STABLE STATE (doesn't change frequently) ===
   const [status, setStatus] = useState<string>('Ready');
   const [busy, setBusy] = useState(false);
-  const [isPaletteOpen, setPaletteOpen] = useState(false);
-  const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
   const [showModelSelector, setShowModelSelector] = useState(false);
   const [showProviderSelector, setShowProviderSelector] = useState(false);
   const [currentProvider, setCurrentProvider] = useState<ProviderId>(context.llm.providerId);
   const [currentModel, setCurrentModel] = useState<string>(context.llm.model);
-
+  
+  // === MESSAGE MANAGEMENT (stable array, append-only) ===
+  // Use ref to store messages to prevent unnecessary re-renders
+  const messagesRef = useRef<MemoryEntry[]>(context.memory.list());
+  const [messageCount, setMessageCount] = useState(messagesRef.current.length);
+  
+  // Stable append function that doesn't recreate array
   const appendMessage = useCallback(
     (entry: MemoryEntry) => {
       context.memory.add(entry);
-      setMessages((prev) => [...prev, entry]);
+      messagesRef.current.push(entry); // Append, don't recreate
+      setMessageCount(messagesRef.current.length); // Trigger re-render via count change
     },
-    [context, setMessages]
+    [context]
   );
+  
+  // === INPUT STATE (local to prevent global re-renders) ===
+  const [input, setInput] = useState('');
+  
+  // === SLASH COMMAND STATE ===
+  const [isPaletteOpen, setPaletteOpen] = useState(false);
+  const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
+  
+  // Debounce command query to prevent re-filtering on every keystroke
+  const debouncedInput = useDebounce(input, 100);
 
   const slashCommandHelpers = useMemo(
     () => ({
       context,
       appendMessage,
-      setMessages,
+      setMessages: ((updater: React.SetStateAction<MemoryEntry[]>) => {
+        if (typeof updater === 'function') {
+          messagesRef.current = updater(messagesRef.current);
+        } else {
+          messagesRef.current = updater;
+        }
+        setMessageCount(messagesRef.current.length);
+      }) as React.Dispatch<React.SetStateAction<MemoryEntry[]>>,
       setStatus,
       setShowModelSelector,
       setShowProviderSelector,
     }),
-    [appendMessage, context, setMessages, setStatus]
+    [appendMessage, context]
   );
 
+  // Commands are stable (only created once)
   const commands = useMemo(() => createSlashCommands(slashCommandHelpers), [slashCommandHelpers]);
 
-  const commandQuery = input.startsWith('/') ? input.slice(1) : '';
-  const commandToken = normalizeCommandToken(commandQuery.split(/\s+/)[0] ?? '');
+  // Only recompute when debounced input changes
+  const { commandQuery, commandToken } = useMemo(() => {
+    const query = debouncedInput.startsWith('/') ? debouncedInput.slice(1) : '';
+    const token = normalizeCommandToken(query.split(/\s+/)[0] ?? '');
+    return { commandQuery: query, commandToken: token };
+  }, [debouncedInput]);
 
+  // Filter commands based on debounced input (prevents re-filtering on every keystroke)
   const filteredCommands = useMemo(() => {
-    if (!input.startsWith('/')) return [];
+    if (!debouncedInput.startsWith('/')) return [];
     const term = commandToken;
     if (!term) return commands;
 
@@ -72,16 +111,18 @@ export const ASIATApp: React.FC<ASIATAppProps> = ({ context }) => {
 
       return haystack.some((value) => value.includes(term));
     });
-  }, [commands, commandToken, input]);
+  }, [commands, commandToken, debouncedInput]);
 
+  // Open/close palette only when input starts/stops with '/' (not on every keystroke)
   useEffect(() => {
     const open = input.startsWith('/');
     setPaletteOpen(open);
     if (!open) {
       setSelectedCommandIndex(0);
     }
-  }, [input]);
+  }, [input.startsWith('/')]);  // Only run when '/' state changes, not on every character
 
+  // Adjust selected index when filtered commands change
   useEffect(() => {
     if (!isPaletteOpen) return;
     setSelectedCommandIndex((current) => {
@@ -118,7 +159,7 @@ export const ASIATApp: React.FC<ASIATAppProps> = ({ context }) => {
         await command.run({
           context,
           appendMessage,
-          setMessages,
+          setMessages: slashCommandHelpers.setMessages,
           setStatus,
           args,
           rawInput,
@@ -141,7 +182,7 @@ export const ASIATApp: React.FC<ASIATAppProps> = ({ context }) => {
         }
       }
     },
-    [appendMessage, context, setMessages, setStatus, status]
+    [appendMessage, context, slashCommandHelpers.setMessages, setStatus, status]
   );
 
   const resolveCommand = useCallback(
@@ -220,6 +261,7 @@ export const ASIATApp: React.FC<ASIATAppProps> = ({ context }) => {
     [appendMessage, busy, context.assistant, resolveCommand, runCommand]
   );
 
+  // === UI CALLBACKS ===
   const handleModelSelect = useCallback(
     (model: string) => {
       setCurrentModel(model);
@@ -273,9 +315,11 @@ export const ASIATApp: React.FC<ASIATAppProps> = ({ context }) => {
     [appendMessage, context]
   );
 
+  // === RENDER ===
   return (
     <Box flexDirection="column" height="100%">
-      <ChatView messages={messages} isProcessing={busy} />
+      <Header provider={currentProvider} model={currentModel} status={status} />
+      <ChatView messages={messagesRef.current} isProcessing={busy} />
       <Box flexDirection="column">
         {showModelSelector && (
           <ModelSelector

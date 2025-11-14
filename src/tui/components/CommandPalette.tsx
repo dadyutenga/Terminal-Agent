@@ -8,7 +8,11 @@ type CommandPaletteProps = {
   query: string;
 };
 
-export const CommandPalette: React.FC<CommandPaletteProps> = ({ commands, selectedIndex, query }) => {
+/**
+ * Memoized command palette - only re-renders when commands array length,
+ * selectedIndex, or query changes. Prevents re-renders on every keystroke.
+ */
+export const CommandPalette = React.memo<CommandPaletteProps>(({ commands, selectedIndex, query }) => {
   const hasCommands = commands.length > 0;
 
   return (
@@ -35,4 +39,13 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ commands, select
       </Box>
     </Box>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison: only re-render if commands count, selectedIndex, or query changes
+  return (
+    prevProps.commands.length === nextProps.commands.length &&
+    prevProps.selectedIndex === nextProps.selectedIndex &&
+    prevProps.query === nextProps.query
+  );
+});
+
+CommandPalette.displayName = 'CommandPalette';

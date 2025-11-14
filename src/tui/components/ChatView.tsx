@@ -51,7 +51,59 @@ const formatMessage = (content: string) => {
   return parts.length > 0 ? parts : [{ type: 'text', content }];
 };
 
-export const ChatView: React.FC<ChatViewProps> = ({ messages, isProcessing = false }) => {
+/**
+ * Memoized message component - only re-renders if the message content changes
+ */
+const MessageItem = React.memo<{ message: MemoryEntry; index: number }>(({ message, index }) => {
+  const messageParts = React.useMemo(() => formatMessage(message.content), [message.content]);
+  
+  return (
+    <Box key={`${message.timestamp}-${index}`} flexDirection="column" marginBottom={1}>
+      <Box>
+        <Text color={roleColor[message.role]} bold>
+          {roleLabel[message.role]}
+        </Text>
+      </Box>
+      <Box
+        flexDirection="column"
+        borderStyle="round"
+        borderColor={roleBorderColor[message.role]}
+        paddingX={1}
+        paddingY={0}
+        marginTop={0}
+      >
+        {messageParts.map((part, partIndex) => {
+          if (part.type === 'code') {
+            return (
+              <Box key={partIndex} flexDirection="column" marginY={0}>
+                <Text color="yellow" dimColor>
+                  📝 {'language' in part ? part.language : 'code'}
+                </Text>
+                <Box
+                  borderStyle="single"
+                  borderColor="yellow"
+                  paddingX={1}
+                  flexDirection="column"
+                >
+                  <Text color="green">{part.content}</Text>
+                </Box>
+              </Box>
+            );
+          }
+          return <Text key={partIndex}>{part.content}</Text>;
+        })}
+      </Box>
+    </Box>
+  );
+});
+
+MessageItem.displayName = 'MessageItem';
+
+/**
+ * ChatView component - memoized to prevent re-renders when messages array reference changes
+ * but content is the same. Only re-renders when message count or isProcessing changes.
+ */
+export const ChatView = React.memo<ChatViewProps>(({ messages, isProcessing = false }) => {
   return (
     <Box flexDirection="column" paddingX={1} flexGrow={1}>
       {messages.length === 0 ? (
@@ -63,47 +115,9 @@ export const ChatView: React.FC<ChatViewProps> = ({ messages, isProcessing = fal
         </Box>
       ) : (
         <>
-          {messages.map((message, index) => {
-            const messageParts = formatMessage(message.content);
-            return (
-              <Box key={`${message.timestamp}-${index}`} flexDirection="column" marginBottom={1}>
-                <Box>
-                  <Text color={roleColor[message.role]} bold>
-                    {roleLabel[message.role]}
-                  </Text>
-                </Box>
-                <Box
-                  flexDirection="column"
-                  borderStyle="round"
-                  borderColor={roleBorderColor[message.role]}
-                  paddingX={1}
-                  paddingY={0}
-                  marginTop={0}
-                >
-                  {messageParts.map((part, partIndex) => {
-                    if (part.type === 'code') {
-                      return (
-                        <Box key={partIndex} flexDirection="column" marginY={0}>
-                          <Text color="yellow" dimColor>
-                            📝 {'language' in part ? part.language : 'code'}
-                          </Text>
-                          <Box
-                            borderStyle="single"
-                            borderColor="yellow"
-                            paddingX={1}
-                            flexDirection="column"
-                          >
-                            <Text color="green">{part.content}</Text>
-                          </Box>
-                        </Box>
-                      );
-                    }
-                    return <Text key={partIndex}>{part.content}</Text>;
-                  })}
-                </Box>
-              </Box>
-            );
-          })}
+          {messages.map((message, index) => (
+            <MessageItem key={`${message.timestamp}-${index}`} message={message} index={index} />
+          ))}
           {isProcessing && (
             <Box marginBottom={1}>
               <Text color="magenta">
@@ -115,4 +129,12 @@ export const ChatView: React.FC<ChatViewProps> = ({ messages, isProcessing = fal
       )}
     </Box>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison: only re-render if message count or processing state changes
+  return (
+    prevProps.messages.length === nextProps.messages.length &&
+    prevProps.isProcessing === nextProps.isProcessing
+  );
+});
+
+ChatView.displayName = 'ChatView';
