@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
+import Gradient from 'ink-gradient';
 import { ChatView } from './components/ChatView.js';
 import { InputBar } from './components/InputBar.js';
 import { CommandPalette } from './components/CommandPalette.js';
@@ -213,10 +214,15 @@ export const ASIATApp: React.FC<ASIATAppProps> = ({ context }) => {
   return (
     <Box flexDirection="column" height="100%">
       <Box paddingX={1} paddingY={0} justifyContent="space-between">
-        <Text color="cyan">ASIA</Text>
-        <Text color={busy ? 'yellow' : 'gray'}>{status}</Text>
+        <Gradient name="rainbow">
+          <Text bold>🤖 ASIA - AI Coding Assistant</Text>
+        </Gradient>
+        <Text color={busy ? 'yellow' : 'gray'}>
+          {busy ? '⏳ ' : '✅ '}
+          {status}
+        </Text>
       </Box>
-      <ChatView messages={messages} />
+      <ChatView messages={messages} isProcessing={busy} />
       <Box flexDirection="column">
         <InputBar value={input} onChange={setInput} onSubmit={handleSubmit} placeholder="Type a request" />
         {isPaletteOpen && (
